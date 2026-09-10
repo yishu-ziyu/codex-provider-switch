@@ -1,0 +1,6 @@
+.DS_Store
+*.icns
+*.iconset/
+icon-*.png
+models.json
+.env
