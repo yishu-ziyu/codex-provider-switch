@@ -2,5 +2,5 @@
 *.icns
 *.iconset/
 icon-*.png
-models.json
+/models.json
 .env
