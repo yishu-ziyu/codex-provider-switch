@@ -87,6 +87,16 @@ model_catalog_json = "/绝对路径/models.json"
 ./scripts/build-app.sh
 ```
 
+## 作为 Codex Skill 安装
+
+这个仓库本身就是一个 skill：`SKILL.md` 告诉 Codex 怎么先判定适用性、先用覆盖方式验证、再改根配置并验收。
+
+```sh
+./scripts/install-skill.sh          # 复制到 ~/.codex/skills/codex-provider-setup
+```
+
+装好后新开一个会话，用 `$codex-provider-setup` 显式触发，或直接说“帮我把 Codex 接到 DeepSeek”让它自动匹配。也可以让 Codex 直接从本仓库安装这个 skill。
+
 ## 实测结论
 
 1. 桌面端与 CLI 共享 `~/.codex/config.toml`。把根 `model_provider` 指向自定义 provider 后，客户端会直接请求该 provider 的地址；我们在本机没有任何转发服务的情况下拿到了正常回答。
@@ -95,7 +105,7 @@ model_catalog_json = "/绝对路径/models.json"
 4. 协议层其实支持按会话指定 provider：app-server 的 `ThreadStartParams` 有 `modelProvider` 字段，手工调用能让单个会话走第三方 provider，但 GUI 没有暴露这个入口。
 5. 想做到"在模型菜单里点着切"，需要一个极小的本机回环转发按模型名分流；不想常驻服务，就用上面的双击切换。
 
-更多细节与实测记录见 [docs/codex-client-notes.md](docs/codex-client-notes.md)。
+更多细节见 [references/client-behavior.md](references/client-behavior.md)、[references/config-snippets.md](references/config-snippets.md) 与 [references/troubleshooting.md](references/troubleshooting.md)。
 
 ## 许可
 

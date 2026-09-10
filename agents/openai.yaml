@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Provider Setup"
+  short_description: "把 Codex 桌面端与 CLI 接到第三方模型，并支持一键切回原生模型"
+  default_prompt: "帮我把 Codex 接到第三方的 Responses API 提供方，并支持在原生模型之间一键切换"
