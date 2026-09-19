@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+"""Launch the installed Codex with a separate OpenCode Go provider overlay."""
+import json
+import os
+import shutil
+import sys
+from pathlib import Path
+
+root = Path(__file__).resolve().parent
+codex = shutil.which("codex")
+if not codex:
+    sys.exit("Codex is not installed or is missing from PATH")
+try:
+    overrides = json.loads((root / "config-overrides.json").read_text())
+    if not isinstance(overrides, list) or not all(isinstance(v, str) for v in overrides):
+        raise ValueError()
+except (OSError, ValueError):
+    sys.exit("Missing or invalid codex-go config-overrides.json")
+
+arguments = [codex]
+for override in overrides:
+    arguments.extend(["-c", override])
+arguments.extend(["-c", "model_catalog_json=" + json.dumps(str(root / "models.json"))])
+arguments.extend(["-c", "model_providers.opencode_go.auth.args=" + json.dumps([str(root / "auth.py")])])
+arguments.extend(sys.argv[1:])
+os.execv(codex, arguments)

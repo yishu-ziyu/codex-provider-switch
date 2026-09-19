@@ -1,0 +1,19 @@
+[
+  "model=\"deepseek-flash\"",
+  "model_provider=\"opencode_go\"",
+  "model_reasoning_effort=\"high\"",
+  "web_search=\"disabled\"",
+  "model_providers.opencode_go.name=\"OpenCode Go\"",
+  "model_providers.opencode_go.base_url=\"http://127.0.0.1:8791/v1\"",
+  "model_providers.opencode_go.wire_api=\"responses\"",
+  "model_providers.opencode_go.requires_openai_auth=false",
+  "model_providers.opencode_go.auth.command=\"/usr/bin/python3\"",
+  "model_providers.opencode_go.auth.timeout_ms=5000",
+  "model_providers.opencode_go.auth.refresh_interval_ms=300000",
+  "features.memories=false",
+  "memories.generate_memories=false",
+  "memories.extract_model=\"deepseek-flash\"",
+  "memories.consolidation_model=\"deepseek-flash\"",
+  "agents.luna.config_file=\"/absolute/path/to/codex-go-worker-v1/src/agents/luna.toml\"",
+  "agents.luna.model=\"deepseek-flash\""
+]
