@@ -1,5 +1,11 @@
 # Codex Provider Switch
 
+> **状态：历史归档（2026-09-19）。** 这套直连切换方案及其后续的
+> `codex-go-worker-v1` 已从维护者的日常环境退役。当前环境改用 OpenCodex
+> 将第三方模型路由为原生 `spawn_agent` 的模型覆盖项。仓库保留用于复盘，
+> 不再代表推荐安装方案。最终一代实现见
+> [`archive/codex-go-worker-v1`](archive/codex-go-worker-v1/README.md)。
+
 让 Codex 桌面端和 CLI 直连第三方模型（DeepSeek、GLM、Kimi 等），并在原生模型与第三方模型之间一键切换。
 
 > Point Codex (desktop app + CLI) at a third-party model provider, and switch between native OpenAI models and the external model with one click.

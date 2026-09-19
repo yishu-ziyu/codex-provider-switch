@@ -1,0 +1,2095 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Worker 面板</title>
+<style>
+  /* 暖中性灰底 + 低饱和绿主色，层级靠字重/间距与轻微深度，减少层层边框 */
+  :root {
+    --bg: #f4f1ec;
+    --panel: #ffffff;
+    --line: #e9e4dc;
+    --line-strong: #d9d3c9;
+    --text: #201e1a;
+    --text-dim: #5e5952;
+    --text-faint: #716b62;
+    --accent: #1f7a4d;
+    --accent-strong: #1b6b43;
+    --accent-soft: #e7f2ea;
+    --accent-line: rgba(31, 122, 77, .24);
+    --warn: #8a6116;
+    --warn-soft: #fbf3e1;
+    --warn-line: #ece0c4;
+    --bad: #a3372c;
+    --bad-soft: #fbeae7;
+    --muted-soft: #ece7e0;
+    --surface-2: #faf8f5;
+    --warm-wash: #faf5ec;
+    --radius-xl: 20px;
+    --radius-lg: 14px;
+    --radius: 12px;
+    --radius-btn: 10px;
+    --shadow-soft: 0 1px 2px rgba(38, 32, 24, .04), 0 14px 34px -20px rgba(38, 32, 24, .22);
+    --shadow-raise: 0 1px 2px rgba(38, 32, 24, .05), 0 3px 8px -3px rgba(38, 32, 24, .12);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 400 14px/1.66 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Source Han Sans SC", sans-serif;
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    overflow-wrap: anywhere;
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button { font: inherit; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 18px 16px 44px; }
+
+  .demo-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    background: var(--warn-soft);
+    border: 1px solid var(--warn-line);
+    border-radius: var(--radius-lg);
+    color: var(--warn);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .demo-banner .tag {
+    flex: none;
+    font-weight: 600;
+    background: #fff;
+    border: 1px solid var(--warn-line);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 11.5px;
+  }
+
+  /* 头部简洁柔和、可轻透明，不做 sticky 以免挤压右侧面板 */
+  header.bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 13px 16px;
+    background: rgba(255, 255, 255, .72);
+    border: 1px solid rgba(38, 32, 24, .06);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 1px 2px rgba(38, 32, 24, .03);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    backdrop-filter: blur(16px) saturate(1.5);
+  }
+  header.bar h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: .005em; }
+  header.bar .sub { color: var(--text-faint); font-size: 12px; }
+  header.bar .spacer { flex: 1 1 auto; }
+  .scope {
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--muted-soft);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 2px 10px;
+  }
+
+  .btn {
+    appearance: none;
+    background: var(--muted-soft);
+    color: var(--text);
+    border: 1px solid transparent;
+    border-radius: var(--radius-btn);
+    padding: 7px 13px;
+    cursor: pointer;
+    line-height: 1.3;
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+      background-color 160ms ease, color 160ms ease,
+      border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .btn:disabled { cursor: not-allowed; opacity: .5; }
+  .btn.primary { background: var(--accent); color: #fff; font-weight: 600; }
+  .btn.small { padding: 5px 11px; font-size: 12.5px; }
+
+  /* 筛选 chips 收进柔和底槽，选中项白色略抬起 */
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 12px;
+    padding: 5px;
+    background: var(--muted-soft);
+    border: 1px solid rgba(38, 32, 24, .04);
+    border-radius: var(--radius-lg);
+  }
+  .chip {
+    appearance: none;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-btn);
+    padding: 5px 12px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+      background-color 160ms ease, color 160ms ease,
+      border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .chip[aria-pressed="true"] {
+    background: #fff;
+    color: var(--accent);
+    font-weight: 600;
+    box-shadow: var(--shadow-raise);
+  }
+  .chip .n { font-family: var(--mono); font-size: 11.5px; }
+
+  main {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 14px;
+    align-items: start;
+  }
+  @media (min-width: 760px) {
+    main { grid-template-columns: minmax(260px, 320px) 1fr; }
+  }
+
+  /* 左列不再白框套卡片：容器透明，卡片直接落在暖灰底上 */
+  .panel { border-radius: var(--radius-lg); }
+  .list-panel { background: transparent; border: 0; padding: 2px 2px 2px 0; }
+  .list-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 2px 2px 10px; }
+  .list-head h2 { font-size: 12px; font-weight: 600; color: var(--text-dim); margin: 0; letter-spacing: .01em; }
+  .list-head .count { font-size: 12px; color: var(--text-faint); }
+
+  ul.cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  li.group { list-style: none; min-width: 0; }
+  .group-head {
+    font-size: 11.5px;
+    color: var(--text-faint);
+    padding: 10px 2px 4px;
+    letter-spacing: .02em;
+  }
+  .empty-note { font-size: 12.5px; color: var(--text-faint); padding: 10px 4px; }
+
+  /* 卡片默认弱底色、无实描边；选中为浅绿 + 细微 inset 强调 */
+  .card {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+    background: rgba(255, 255, 255, .58);
+    border: 0;
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    cursor: pointer;
+    color: inherit;
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+      background-color 160ms ease, color 160ms ease,
+      border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .card[aria-pressed="true"] {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+  }
+  .card-top { display: flex; align-items: flex-start; gap: 8px; justify-content: space-between; }
+  .card-title { font-weight: 600; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+  .card-meta { font-size: 12px; color: var(--text-dim); overflow-wrap: anywhere; }
+  .card-sub { font-size: 11.5px; color: var(--text-faint); overflow-wrap: anywhere; }
+  .card-sel { font-size: 11px; color: var(--accent); font-weight: 600; }
+
+  .badge {
+    flex: none;
+    font-size: 11px;
+    line-height: 1.5;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--muted-soft);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .badge[data-tone="run"] { background: var(--accent-soft); color: var(--accent); }
+  .badge[data-tone="warn"] { background: var(--warn-soft); color: var(--warn); }
+  .badge[data-tone="bad"] { background: var(--bad-soft); color: var(--bad); }
+  .badge[data-tone="muted"] { background: var(--muted-soft); color: var(--text-dim); }
+
+  /* 右侧详情：白色主面板、20px 圆角、非常轻的阴影 */
+  .detail {
+    background: var(--panel);
+    border: 1px solid rgba(38, 32, 24, .05);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-soft);
+    padding: 20px 22px 24px;
+  }
+  .detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .detail-head h2 { font-size: 18px; font-weight: 600; margin: 0; min-width: 0; overflow-wrap: anywhere; letter-spacing: -.005em; }
+
+  /* 元信息去掉大背景框，字号小一级 */
+  dl.meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 6px 18px;
+    margin: 16px 0 0;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+  dl.meta div { min-width: 0; }
+  dt { font-size: 11px; color: var(--text-faint); }
+  dd { margin: 1px 0 0; font-size: 12.5px; color: var(--text); overflow-wrap: anywhere; }
+
+  /* 章节靠适中留白分隔，不用重框 */
+  .block { margin-top: 18px; }
+  .block h3 { font-size: 12.5px; font-weight: 600; color: var(--text-dim); margin: 0 0 7px; letter-spacing: .01em; }
+  .block p { margin: 0; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+  .actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .hint { font-size: 12px; color: var(--text-dim); }
+  .placeholder { font-size: 12.5px; color: var(--text-faint); margin: 0; }
+
+  /* 需要你决定的区域：很淡暖色提示，不抢焦点 */
+  .block:has(#dDecideActions) {
+    background: var(--warm-wash);
+    border-radius: var(--radius-lg);
+    padding: 12px 14px;
+  }
+  .block:has(#dDecideActions) h3 { color: var(--warn); }
+
+  .evidence-result {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+  figure.shot { margin: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface-2); }
+  figure.shot img { display: block; width: 100%; height: auto; object-fit: contain; }
+  figure.shot figcaption { font-size: 11px; color: var(--text-faint); padding: 5px 8px; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+
+  .feedback { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 18px; }
+  .recipient { font-size: 12.5px; color: var(--text-dim); margin: 0 0 10px; }
+  .recipient strong { color: var(--text); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .refchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--muted-soft);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 3px 6px 3px 10px;
+  }
+  .refchip.on { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+  .linklike {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 1px 4px;
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  label.field { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+  textarea#replyInput {
+    width: 100%;
+    min-width: 0;
+    min-height: 80px;
+    resize: vertical;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 9px 12px;
+    transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  }
+  textarea#replyInput:focus {
+    outline: none;
+    background: #fff;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-line);
+  }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-dim); }
+  .error {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    color: var(--bad);
+    background: var(--bad-soft);
+    border: 1px solid rgba(163, 55, 44, .22);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+  }
+  .error[hidden] { display: none; }
+
+  ul.msgs { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  li.msg {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    padding: 9px 11px;
+  }
+  li.msg[data-state="failed"] { border-color: rgba(163, 55, 44, .28); background: var(--bad-soft); }
+  .msg-head { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; font-size: 11.5px; color: var(--text-faint); }
+  .msg-text { margin: 5px 0 0; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .msg-ref { margin: 4px 0 0; font-size: 11.5px; color: var(--accent); }
+  ol.steps { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  ol.steps li { font-size: 11.5px; color: var(--text-faint); }
+  ol.steps li[data-step="done"] { color: var(--accent); }
+  ol.steps li[data-step="failed"] { color: var(--bad); font-weight: 600; }
+  .msg-note { margin: 6px 0 0; font-size: 11.5px; color: var(--text-dim); }
+
+  details.tech {
+    margin-top: 18px;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+  details.tech > summary { font-size: 12px; font-weight: 600; color: var(--text-dim); cursor: pointer; }
+  .records { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 0; }
+  .rec-note { margin: 6px 0 0; font-size: 12px; color: var(--text-dim); }
+  .rec-note[hidden] { display: none; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* hover 只在精确指针设备生效 */
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled) { background: #e5dfd6; }
+    .btn.primary:hover:not(:disabled) { background: var(--accent-strong); }
+    .chip:hover { background: rgba(255, 255, 255, .62); color: var(--text); }
+    .chip[aria-pressed="true"]:hover { background: #fff; color: var(--accent); }
+    .card:hover { background: #fff; box-shadow: var(--shadow-raise); }
+    .card[aria-pressed="true"]:hover { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line), var(--shadow-raise); }
+    .linklike:hover { color: var(--accent-strong); }
+  }
+
+  /* 按压反馈：仅指针输入下轻微缩放，键盘不产生位移 */
+  html[data-input="pointer"] .btn:active:not(:disabled),
+  html[data-input="pointer"] .chip:active,
+  html[data-input="pointer"] button.card:active {
+    transform: scale(.98);
+  }
+
+  /* 小屏：收紧圆角与内边距，避免长词撑破 */
+  @media (max-width: 640px) {
+    .wrap { padding: 14px 12px 36px; }
+    .detail { border-radius: var(--radius-lg); padding: 16px 15px 20px; }
+    .detail-head h2 { font-size: 17px; }
+    dl.meta { grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+    .list-panel { padding: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+    html[data-input="pointer"] .btn:active:not(:disabled),
+    html[data-input="pointer"] .chip:active,
+    html[data-input="pointer"] button.card:active { transform: none; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    header.bar {
+      background: #fff;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+  @media (prefers-contrast: more) {
+    :root { --line: #b9b1a4; --line-strong: #9b9284; }
+    header.bar, .detail { border-color: var(--line-strong); }
+    .filters { border-color: var(--line-strong); }
+    .card { background: #fff; box-shadow: inset 0 0 0 1px var(--line-strong); }
+    .card[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .chip[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  }
+  html[data-input="keyboard"] button { transition: none; }
+
+  /* ---- 真实面板补充：连接状态、范围切换、动作列表、结果与原始动作 ---- */
+  .badge[data-tone="ok"] { background: var(--accent-soft); color: var(--accent); }
+  .conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+  .conn[data-state="error"] .dot { background: var(--bad); }
+  .conn[data-state="loading"] .dot { background: var(--text-faint); }
+  .scope-toggle { display: inline-flex; gap: 3px; background: var(--muted-soft); border-radius: 999px; padding: 3px; }
+  .scope-toggle button {
+    appearance: none; background: transparent; border: 1px solid transparent; border-radius: 999px;
+    padding: 2px 10px; font-size: 12px; color: var(--text-dim); cursor: pointer;
+  }
+  .scope-toggle button[aria-pressed="true"] { background: #fff; color: var(--accent); font-weight: 600; box-shadow: var(--shadow-raise); }
+  .list-panel .error { margin: 0 2px 8px; }
+  ul.events { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  ul.events li {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 12.5px;
+    padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface-2); overflow-wrap: anywhere;
+  }
+  .ev-kind { font-family: var(--mono); font-size: 11px; color: var(--text-faint); flex: none; }
+  .ev-title { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+  .ev-status { font-size: 11px; color: var(--text-dim); flex: none; }
+  details.tech ul.events { margin: 8px 0 0; max-height: 320px; overflow: auto; }
+  pre.result {
+    margin: 0; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: var(--radius); font: 12.5px/1.65 var(--mono); white-space: pre-wrap;
+    overflow-wrap: anywhere; max-height: 340px; overflow: auto;
+  }
+  pre.result[hidden] { display: none; }
+  .shots { margin-top: 8px; }
+  figure.shot[data-failed="true"] img { display: none; }
+  .card-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .card-chips:empty { display: none; }
+  .msg-actions { margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <h1>Worker 面板</h1>
+    <span class="sub">任务进度与反馈</span>
+    <span class="spacer"></span>
+    <span class="scope" id="scopeChip">范围：全部任务</span>
+    <span class="conn" id="conn" data-state="loading">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="connText">连接中…</span>
+    </span>
+    <button class="btn" id="refreshBtn" type="button">刷新</button>
+  </header>
+
+  <p class="error" id="storageWarn" role="alert" hidden>浏览器未能保存草稿，刷新会丢失本页草稿</p>
+
+  <div class="filters" id="filters" aria-label="按真实状态过滤任务"></div>
+
+  <main>
+    <section class="panel list-panel" aria-labelledby="listTitle">
+      <div class="list-head">
+        <h2 id="listTitle">任务</h2>
+        <span class="count" id="count"></span>
+      </div>
+      <p class="error" id="listError" role="status" aria-live="polite" hidden></p>
+      <ul class="cards" id="taskList"></ul>
+    </section>
+
+    <section class="panel detail" aria-labelledby="dTitle">
+      <div class="detail-head">
+        <h2 id="dTitle">—</h2>
+        <span class="badge" id="dStage">—</span>
+        <span class="badge" id="dGroup" hidden></span>
+        <span class="badge" id="dParent" data-tone="muted" hidden></span>
+        <span class="badge" id="dQuiet" data-tone="muted" hidden>静默时长较长</span>
+        <span class="badge" id="dLegacy" data-tone="muted" hidden>历史任务 · 只读</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn small" id="cancelBtn" type="button" hidden>取消任务</button>
+        <span class="hint" id="cancelHint" hidden></span>
+        <span class="hint" id="staleHint" hidden></span>
+      </div>
+
+      <p class="placeholder" id="detailEmpty">正在加载任务…</p>
+
+      <div id="detailBody" hidden>
+        <section class="block">
+          <h3>任务目标</h3>
+          <p id="dGoal">—</p>
+        </section>
+
+        <section class="block">
+          <h3>实际进展（最近动作）</h3>
+          <ul class="events" id="dProgress"></ul>
+        </section>
+
+        <section class="block">
+          <h3>最新结果与截图</h3>
+          <pre class="result" id="dResult" hidden></pre>
+          <p class="placeholder" id="dResultNote">暂无返回结果。</p>
+          <div class="shots" id="dShots"></div>
+        </section>
+
+        <section class="block feedback" aria-labelledby="fbTitle">
+          <h3 id="fbTitle">你的反馈</h3>
+          <p class="recipient" id="fbRecipient">接收对象：执行者</p>
+          <div class="chips" id="dRefChips"></div>
+          <label class="field" for="replyInput">反馈内容（仅本任务，可自由回复）</label>
+          <textarea id="replyInput" name="replyInput" rows="3"></textarea>
+          <div class="actions">
+            <button class="btn primary" id="sendBtn" type="button">发送</button>
+            <span class="hint" id="sendHint"></span>
+          </div>
+          <p class="error" id="sendError" role="alert" hidden></p>
+          <ul class="msgs" id="msgList"></ul>
+        </section>
+
+        <dl class="meta">
+          <div><dt>角色</dt><dd id="mRole">—</dd></div>
+          <div><dt>模型</dt><dd id="mModel">—</dd></div>
+          <div><dt>工作区</dt><dd id="mWorkspace">—</dd></div>
+          <div><dt>更新</dt><dd id="mUpdated">—</dd></div>
+        </dl>
+
+        <details class="tech">
+          <summary>原始动作与技术记录</summary>
+          <ul class="events" id="dRaw"></ul>
+          <p class="rec-note" id="dRecNote"></p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <p class="sr-only" id="live" role="status" aria-live="polite"></p>
+</div>
+
+<script>
+// 反馈跟随输入设备；键盘导航保持即时（沿用已确认的交互基线）
+document.addEventListener('pointerdown', function () {
+  document.documentElement.dataset.input = 'pointer';
+}, {capture: true, passive: true});
+document.addEventListener('keydown', function () {
+  document.documentElement.dataset.input = 'keyboard';
+}, {capture: true});
+
+(function () {
+  "use strict";
+
+  var POLL_MS = 2000;
+  var TOKEN = location.hash.slice(1);
+  window.addEventListener("hashchange", function () { TOKEN = location.hash.slice(1); });
+
+  /* 面板实例标识：同一浏览器里不同面板实例各自独立保存草稿/引用 */
+  function hash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(16);
+  }
+  var INST = hash(TOKEN || "no-token").slice(0, 8);
+
+  var STATUS = {
+    starting: { label: "启动中", tone: "run" },
+    running: { label: "执行中", tone: "run" },
+    completed_unverified: { label: "已返回 · 待GPT6检查", tone: "warn" },
+    failed: { label: "已失败", tone: "bad" },
+    cancelled: { label: "已取消", tone: "muted" },
+    deadline_reached: { label: "已达截止时间", tone: "warn" }
+  };
+
+  /* 消息状态语义：delivered 只代表执行者已接收，绝不等于已按要求完成 */
+  var MSG = {
+    queued: { label: "已排队", tone: "muted", note: "已进入执行者队列，等待执行者接收。" },
+    sending: { label: "派发中", tone: "muted", note: "正在交给执行者，尚未确认接收。" },
+    delivered: { label: "已接收", tone: "run", note: "执行者已接收这次反馈并开始处理；这只代表已受理，不代表已按你的意见完成。" },
+    replied: { label: "已回复", tone: "ok", note: "执行者本轮已回复，请对照结果与截图自行判断。" },
+    failed: { label: "失败", tone: "bad", note: "这次反馈没有送达执行者。原文与引用已保留，可复制后重新发送。" },
+    uncertain: { label: "无法确认", tone: "warn", note: "网络中断，无法确认是否送达。重试沿用同一提交编号，不会重复执行。" }
+  };
+
+  var BUCKETS = [
+    { id: "pending", label: "待处理" },
+    { id: "review", label: "待GPT6检查" },
+    { id: "active", label: "执行中" },
+    { id: "stopped", label: "已停止" },
+    { id: "all", label: "全部" }
+  ];
+  var GROUP_ORDER = ["pending", "review", "active", "stopped"];
+  var PENDING_LABEL = { failed: "失败", input: "等你下一步", unknown: "状态未知", delivery: "投递待确认" };
+
+  var els = {
+    scopeChip: document.getElementById("scopeChip"),
+    conn: document.getElementById("conn"),
+    connText: document.getElementById("connText"),
+    refreshBtn: document.getElementById("refreshBtn"),
+    storageWarn: document.getElementById("storageWarn"),
+    filters: document.getElementById("filters"),
+    listError: document.getElementById("listError"),
+    count: document.getElementById("count"),
+    taskList: document.getElementById("taskList"),
+    dTitle: document.getElementById("dTitle"),
+    dStage: document.getElementById("dStage"),
+    dGroup: document.getElementById("dGroup"),
+    dParent: document.getElementById("dParent"),
+    dQuiet: document.getElementById("dQuiet"),
+    dLegacy: document.getElementById("dLegacy"),
+    cancelBtn: document.getElementById("cancelBtn"),
+    cancelHint: document.getElementById("cancelHint"),
+    staleHint: document.getElementById("staleHint"),
+    detailEmpty: document.getElementById("detailEmpty"),
+    detailBody: document.getElementById("detailBody"),
+    dGoal: document.getElementById("dGoal"),
+    dProgress: document.getElementById("dProgress"),
+    dResult: document.getElementById("dResult"),
+    dResultNote: document.getElementById("dResultNote"),
+    dShots: document.getElementById("dShots"),
+    dRefChips: document.getElementById("dRefChips"),
+    fbRecipient: document.getElementById("fbRecipient"),
+    reply: document.getElementById("replyInput"),
+    sendBtn: document.getElementById("sendBtn"),
+    sendHint: document.getElementById("sendHint"),
+    sendError: document.getElementById("sendError"),
+    msgList: document.getElementById("msgList"),
+    mRole: document.getElementById("mRole"),
+    mModel: document.getElementById("mModel"),
+    mWorkspace: document.getElementById("mWorkspace"),
+    mUpdated: document.getElementById("mUpdated"),
+    dRaw: document.getElementById("dRaw"),
+    dRecNote: document.getElementById("dRecNote"),
+    live: document.getElementById("live")
+  };
+
+  var runs = null;
+  var runsError = "";
+  var lastOk = 0;
+  var selectedId = null;
+  var currentRun = null;
+  var detail = null;
+  var detailError = "";
+  var detailAt = 0;
+  var msgCache = {};              // runId -> { messages, at }
+  var cardNodes = new Map();      // runId -> { li, btn, ... }
+  var shotNodes = new Map();
+  var shotPlaceholder = null;
+  var pollBusy = false;
+  var cancelBusy = false;
+  var cancelMsg = "";
+  var sendBusy = false;
+  var shownRunId = null;
+  var filter = "all";
+  var scope = "all";
+  var currentGroup = readUrlGroup();
+  var attached = {};              // runId -> digest|null（草稿引用）
+  var storageOk = true;
+
+  function readUrlGroup() {
+    try { return new URLSearchParams(location.search).get("task_group") || ""; }
+    catch (e) { return ""; }
+  }
+
+  /* ---------- 基础工具 ---------- */
+
+  function statusInfo(status) {
+    var s = typeof status === "string" ? status : "";
+    if (STATUS[s]) return STATUS[s];
+    if (!s) return { label: "状态未知", tone: "muted" };
+    return { label: s, tone: "muted" };
+  }
+
+  function statusKnown(status) {
+    return typeof status === "string" && Object.prototype.hasOwnProperty.call(STATUS, status);
+  }
+
+  function roleLabel(role) {
+    if (role === "execute") return "执行";
+    if (role === "review") return "审查";
+    if (typeof role === "string" && role) return role;
+    return "角色待确认";
+  }
+
+  function text(value, fallback) {
+    if (value === null || value === undefined) return fallback || "—";
+    var s = String(value);
+    return s ? s : (fallback || "—");
+  }
+
+  function basename(p) {
+    if (typeof p !== "string" || !p) return "—";
+    var parts = p.replace(/[\\/]+$/, "").split(/[\\/]/);
+    var name = parts[parts.length - 1];
+    return name ? name : "—";
+  }
+
+  function shortId(id) {
+    var s = id === null || id === undefined ? "" : String(id);
+    return s.length > 12 ? s.slice(0, 8) + "…" : s;
+  }
+
+  function pad2(n) { return n < 10 ? "0" + n : String(n); }
+
+  function clock(ms) {
+    var d = new Date(ms);
+    return pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+  }
+
+  function toMs(v) {
+    if (v === null || v === undefined || v === "") return NaN;
+    if (typeof v === "number") return v < 1e12 ? v * 1000 : v;
+    var d = new Date(v);
+    return d.getTime();
+  }
+
+  function fmtTime(v) {
+    var ms = toMs(v);
+    if (!isFinite(ms)) return v === null || v === undefined || v === "" ? "—" : String(v);
+    return clock(ms);
+  }
+
+  function fmtDuration(v) {
+    if (v === null || v === undefined || v === "" || !isFinite(Number(v))) return "—";
+    var s = Math.max(0, Math.round(Number(v)));
+    if (s < 60) return s + "秒";
+    var m = Math.floor(s / 60), sec = s % 60;
+    if (m < 60) return m + "分" + (sec ? (sec < 10 ? "0" + sec : String(sec)) + "秒" : "");
+    var h = Math.floor(m / 60), rem = m % 60;
+    return h + "时" + (rem < 10 ? "0" + rem : String(rem)) + "分";
+  }
+
+  function sameOrigin(u) {
+    try { return new URL(u, location.href).origin === location.origin; }
+    catch (e) { return false; }
+  }
+
+  function uuid() {
+    if (window.crypto && typeof crypto.randomUUID === "function") {
+      try { return crypto.randomUUID(); } catch (e) { /* 退化到下面的实现 */ }
+    }
+    if (window.crypto && typeof crypto.getRandomValues === "function") {
+      var b = new Uint8Array(16);
+      crypto.getRandomValues(b);
+      b[6] = (b[6] & 0x0f) | 0x40;
+      b[8] = (b[8] & 0x3f) | 0x80;
+      var h = [];
+      for (var i = 0; i < 16; i++) h.push((b[i] + 0x100).toString(16).slice(1));
+      return h.slice(0, 4).join("") + "-" + h.slice(4, 6).join("") + "-" + h.slice(6, 8).join("") +
+        "-" + h.slice(8, 10).join("") + "-" + h.slice(10, 16).join("");
+    }
+    return "id-" + Date.now().toString(16) + "-" + Math.random().toString(16).slice(2, 10);
+  }
+
+  function say(message) { els.live.textContent = message; }
+
+  /* 图片 digest 就是 API 图片 URL 的末段 */
+  function digestOf(url) {
+    if (typeof url !== "string" || !url) return "";
+    var tail = url.split("?")[0].replace(/\/+$/, "").split("/").pop() || "";
+    return tail;
+  }
+
+  function digestTail(digest) {
+    var s = typeof digest === "string" ? digest : "";
+    return s.length > 8 ? s.slice(-8) : s;
+  }
+
+  /* ---------- 本地存储（每个 run + 面板实例独立） ---------- */
+
+  function draftKey(runId) { return "worker-panel-v2:" + INST + ":draft:" + runId; }
+  function outboxKey(runId) { return "worker-panel-v2:" + INST + ":outbox:" + runId; }
+
+  function lsGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+
+  function lsSet(key, value) {
+    try { localStorage.setItem(key, value); return true; }
+    catch (e) { return false; }
+  }
+
+  function lsDel(key) {
+    try { localStorage.removeItem(key); return true; } catch (e) { return false; }
+  }
+
+  function noteStorage(result) {
+    if (result === false) {
+      storageOk = false;
+      els.storageWarn.hidden = false;
+    }
+  }
+
+  function readDraft(runId) {
+    var raw = lsGet(draftKey(runId));
+    if (!raw) return { text: "", image: null };
+    try {
+      var d = JSON.parse(raw);
+      return { text: typeof d.text === "string" ? d.text : "", image: typeof d.image === "string" ? d.image : null };
+    } catch (e) { return { text: "", image: null }; }
+  }
+
+  function writeDraft(runId, text, image) {
+    var payload = { text: text, image: image || null, at: Date.now() };
+    noteStorage(lsSet(draftKey(runId), JSON.stringify(payload)));
+  }
+
+  function outboxList(runId) {
+    var raw = lsGet(outboxKey(runId));
+    if (!raw) return [];
+    try {
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+
+  function outboxSave(runId, list) {
+    if (!list.length) { lsDel(outboxKey(runId)); return; }
+    noteStorage(lsSet(outboxKey(runId), JSON.stringify(list)));
+  }
+
+  function outboxPut(runId, entry) {
+    var list = outboxList(runId);
+    var found = false;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].id === entry.id) { list[i] = entry; found = true; break; }
+    }
+    if (!found) list.push(entry);
+    outboxSave(runId, list);
+  }
+
+  function outboxRemove(runId, id) {
+    var list = outboxList(runId);
+    var next = list.filter(function (e) { return e && e.id !== id; });
+    if (next.length !== list.length) outboxSave(runId, next);
+  }
+
+  function outboxHas(runId, id) {
+    var list = outboxList(runId);
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].id === id) return true;
+    return false;
+  }
+
+  /* ---------- 网络 ---------- */
+
+  function api(path, options) {
+    var opts = options || {};
+    var headers = { Authorization: "Bearer " + TOKEN };
+    if (opts.headers) {
+      for (var k in opts.headers) {
+        if (Object.prototype.hasOwnProperty.call(opts.headers, k)) headers[k] = opts.headers[k];
+      }
+    }
+    return fetch(path, {
+      method: opts.method || "GET",
+      headers: headers,
+      body: opts.body,
+      cache: "no-store",
+      credentials: "same-origin"
+    });
+  }
+
+  function getJson(path) {
+    return api(path).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    });
+  }
+
+  /* ---------- 分桶（只依据真实状态与真实消息，绝不把静默当成等待答复） ---------- */
+
+  function cachedMessages(runId) {
+    var entry = msgCache[runId];
+    if (entry && Array.isArray(entry.messages)) return entry.messages;
+    return null;
+  }
+
+  function deliveryTrouble(messages) {
+    if (!messages) return false;
+    for (var i = 0; i < messages.length; i++) {
+      var s = messages[i] && messages[i].status;
+      if (s === "failed" || s === "uncertain") return true;
+    }
+    return false;
+  }
+
+  function awaitingInput(run, messages) {
+    return run.awaiting_input === true;
+  }
+
+  function bucketOf(run) {
+    var s = run.status;
+    var messages = cachedMessages(run.id);
+    if (deliveryTrouble(messages)) return "pending";
+    if (s === "failed") return "pending";
+    if (s === "completed_unverified") return "review";
+    if (s === "cancelled" || s === "deadline_reached") return "stopped";
+    if (s === "starting" || s === "running") {
+      if (awaitingInput(run, messages)) return "pending";
+      return "active";
+    }
+    return "pending"; // 状态未知（缺失或非预期状态）
+  }
+
+  function pendingReason(run) {
+    var s = run.status;
+    var messages = cachedMessages(run.id);
+    if (deliveryTrouble(messages)) return PENDING_LABEL.delivery;
+    if (s === "failed") return PENDING_LABEL.failed;
+    if ((s === "starting" || s === "running") && awaitingInput(run, messages)) return PENDING_LABEL.input;
+    return PENDING_LABEL.unknown;
+  }
+
+  function canSend(run) {
+    if (!run) return false;
+    // 后端给出的 can_message 是权威判断（含 legacy / cancelled / deadline / stale）
+    if (typeof run.can_message === "boolean") return run.can_message;
+    if (!run.messaging_enabled) return false;
+    var s = run.status;
+    return s === "starting" || s === "running" || s === "completed_unverified" || s === "failed";
+  }
+
+  var BLOCK_REASON_ZH = {
+    "Worker is connecting; please wait": "Worker正在连接，连接完成后可发送。",
+    "Legacy run: live messages are unavailable": "该任务为历史任务，不支持反馈（只读）。",
+    "Run can no longer receive messages": "该任务已停止，不能再发送反馈。",
+    "Supervisor heartbeat is stale; inspect the run before sending": "监督进程心跳已过期，请先检查该任务再发送。",
+    "Message id already accepted with different content": "这条提交编号已存在且内容不同，已停止，不会重复执行。请重新发送。"
+  };
+
+  function blockReasonZh(reason) {
+    if (!reason) return "";
+    return BLOCK_REASON_ZH[reason] || ("该任务当前不能接收反馈：" + reason);
+  }
+
+  function sendHintFor(run) {
+    if (!run) return "";
+    if (sendBusy) return "正在发送…";
+    if (canSend(run) === false) {
+      if (run.message_block_reason) return blockReasonZh(run.message_block_reason);
+      if (!run.messaging_enabled) return "该任务为历史任务，不支持反馈（只读）。";
+      var st = run.status;
+      if (st === "cancelled") return "该任务已取消，不能再发送反馈。";
+      if (st === "deadline_reached" || st === "deadline" || st === "expired") return "该任务已达截止时间，不能再发送反馈。";
+      return "状态未知，暂不能发送反馈。";
+    }
+    if (!run.messaging_enabled) return "该任务为历史任务，不支持反馈（只读）。";
+    var s = run.status;
+    if (s === "cancelled") return "该任务已取消，不能再发送反馈。";
+    if (s === "deadline_reached") return "该任务已达截止时间，不能再发送反馈。";
+    if (!statusKnown(s)) return "状态未知，暂不能发送反馈。";
+    if (s === "completed_unverified") return "该任务已返回结果（待GPT6检查）。可以继续给同一个执行者发消息，接续原会话。";
+    if (s === "failed") return "该任务执行失败。可以继续给同一个执行者发消息，沿用原会话。";
+    if (s === "starting") return "执行者正在启动，反馈会先排队。";
+    return "反馈会交给正在运行的原执行者；送达后请以回执状态为准。";
+  }
+
+  /* ---------- 列表 ---------- */
+
+  function visibleRuns() {
+    if (!runs) return [];
+    if (scope === "task" && currentGroup) {
+      return runs.filter(function (r) { return r && r.task_group === currentGroup; });
+    }
+    return runs.slice();
+  }
+
+  function sortedRuns() {
+    return visibleRuns().slice().sort(function (a, b) {
+      var ba = GROUP_ORDER.indexOf(bucketOf(a));
+      var bb = GROUP_ORDER.indexOf(bucketOf(b));
+      if (ba !== bb) return ba - bb;
+      return (b.updated_at || 0) - (a.updated_at || 0);
+    });
+  }
+
+  function countsOf(list) {
+    var c = { pending: 0, review: 0, active: 0, stopped: 0, all: 0 };
+    for (var i = 0; i < list.length; i++) {
+      c[bucketOf(list[i])]++;
+      c.all++;
+    }
+    return c;
+  }
+
+  function makeBadge(label, tone) {
+    var el = document.createElement("span");
+    el.className = "badge";
+    if (tone) el.dataset.tone = tone;
+    el.textContent = label;
+    return el;
+  }
+
+  function createCard(run) {
+    var li = document.createElement("li");
+    li.className = "group";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "card";
+
+    var top = document.createElement("div");
+    top.className = "card-top";
+    var title = document.createElement("span");
+    title.className = "card-title";
+    var badge = document.createElement("span");
+    badge.className = "badge";
+    top.appendChild(title);
+    top.appendChild(badge);
+
+    var goal = document.createElement("div");
+    goal.className = "card-meta";
+    var meta = document.createElement("div");
+    meta.className = "card-sub";
+    var chips = document.createElement("div");
+    chips.className = "card-chips";
+    var sel = document.createElement("div");
+    sel.className = "card-sel";
+    sel.textContent = "已选中";
+    sel.hidden = true;
+
+    btn.appendChild(top);
+    btn.appendChild(goal);
+    btn.appendChild(meta);
+    btn.appendChild(chips);
+    btn.appendChild(sel);
+    li.appendChild(btn);
+
+    var card = { li: li, btn: btn, title: title, badge: badge, goal: goal, meta: meta, chips: chips, sel: sel, id: String(run.id) };
+    btn.addEventListener("click", function () { selectRun(card.id); });
+    return card;
+  }
+
+  function updateCard(card, run) {
+    card.id = String(run.id);
+    card.btn.dataset.id = card.id;
+    card.title.textContent = text(run.title, card.id);
+
+    var info = statusInfo(run.status);
+    card.badge.textContent = info.label;
+    card.badge.dataset.tone = info.tone;
+
+    card.goal.textContent = "目标：" + text(run.goal, "见详情");
+    card.meta.textContent = [
+      roleLabel(run.role),
+      text(run.actual_model, "模型待确认"),
+      fmtDuration(run.elapsed_seconds)
+    ].join(" · ");
+
+    card.chips.textContent = "";
+    var bucket = bucketOf(run);
+    if (bucket === "pending" && run.status !== "failed") {
+      card.chips.appendChild(makeBadge("待处理：" + pendingReason(run), "warn"));
+    }
+    if (run.task_group) card.chips.appendChild(makeBadge("任务组 " + shortId(run.task_group), "muted"));
+    if (run.parent_run_id) card.chips.appendChild(makeBadge("关联 " + shortId(run.parent_run_id), "muted"));
+    if (run.needs_attention && (run.status === "running" || run.status === "starting")) {
+      card.chips.appendChild(makeBadge("静默较长", "muted"));
+    }
+    if (run.cancel_requested && (run.status === "running" || run.status === "starting")) {
+      card.chips.appendChild(makeBadge("取消请求已发送", "muted"));
+    }
+    if (!run.messaging_enabled && run.transport !== "app-server") card.chips.appendChild(makeBadge("历史任务 · 只读", "muted"));
+
+    var selected = String(selectedId) === card.id;
+    card.btn.setAttribute("aria-pressed", selected ? "true" : "false");
+    card.sel.hidden = !selected;
+  }
+
+  function groupHead(bucket) {
+    var node = document.createElement("li");
+    node.className = "group";
+    node.dataset.head = bucket;
+    var head = document.createElement("div");
+    head.className = "group-head";
+    node.appendChild(head);
+    return node;
+  }
+
+  function reconcile(container, desired) {
+    var i = 0;
+    for (; i < desired.length; i++) {
+      var node = desired[i];
+      if (container.childNodes[i] !== node) container.insertBefore(node, container.childNodes[i] || null);
+    }
+    while (container.childNodes.length > desired.length) container.removeChild(container.lastChild);
+  }
+
+  function renderList() {
+    if (runs === null) return;
+    renderFilters(); // 分桶可能随真实消息变化，计数必须与列表同步
+    var list = sortedRuns();
+    var desired = [];
+    if (filter === "all") {
+      for (var g = 0; g < GROUP_ORDER.length; g++) {
+        var bucket = GROUP_ORDER[g];
+        var members = list.filter(function (r) { return bucketOf(r) === bucket; });
+        if (!members.length) continue;
+        var head = groupHead(bucket);
+        head.firstChild.textContent = BUCKET_LABELS[bucket] + "（" + members.length + "）";
+        desired.push(head);
+        for (var m = 0; m < members.length; m++) {
+          var c = cardNodes.get(String(members[m].id));
+          if (!c) { c = createCard(members[m]); cardNodes.set(String(members[m].id), c); }
+          updateCard(c, members[m]);
+          desired.push(c.li);
+        }
+      }
+    } else {
+      var picked = list.filter(function (r) { return bucketOf(r) === filter; });
+      for (var p = 0; p < picked.length; p++) {
+        var card = cardNodes.get(String(picked[p].id));
+        if (!card) { card = createCard(picked[p]); cardNodes.set(String(picked[p].id), card); }
+        updateCard(card, picked[p]);
+        desired.push(card.li);
+      }
+    }
+
+    var emptyNode = document.getElementById("emptyNote");
+    if (!desired.length) {
+      if (!emptyNode) {
+        emptyNode = document.createElement("li");
+        emptyNode.className = "empty-note";
+        emptyNode.id = "emptyNote";
+      }
+      emptyNode.textContent = runs.length === 0 ? "暂无任务。新任务出现后会自动显示。" : "该分类暂无任务。";
+      desired.push(emptyNode);
+    } else if (emptyNode && emptyNode.parentNode) {
+      emptyNode.remove();
+    }
+    reconcile(els.taskList, desired);
+
+    var live = {};
+    for (var q = 0; q < runs.length; q++) live[String(runs[q].id)] = true;
+    cardNodes.forEach(function (card, id) {
+      if (!live[id]) { card.li.remove(); cardNodes.delete(id); }
+    });
+
+    var total = visibleRuns().length;
+    els.count.textContent = total ? "显示 " + (filter === "all" ? list.length : list.filter(function(r) { return bucketOf(r) === filter; }).length) + " / 共 " + total + " 项" : "";
+  }
+
+  var BUCKET_LABELS = { pending: "待处理", review: "待GPT6检查", active: "执行中", stopped: "已停止" };
+
+  /* 筛选 chips 只建一次，轮询时只更新计数与选中态，避免每 2 秒重绘 */
+  var filterNodes = null;
+
+  function ensureFilters() {
+    if (filterNodes) return;
+    filterNodes = [];
+    els.filters.textContent = "";
+    BUCKETS.forEach(function (f) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      var labelNode = document.createTextNode("");
+      var n = document.createElement("span");
+      n.className = "n";
+      b.appendChild(labelNode);
+      b.appendChild(n);
+      b.addEventListener("click", function () {
+        filter = f.id;
+        renderFilters();
+        renderList();
+        say("过滤：" + f.label + "，共 " + countsOf(visibleRuns())[f.id] + " 个任务。");
+      });
+      els.filters.appendChild(b);
+      filterNodes.push({ f: f, btn: b, label: labelNode, n: n });
+    });
+  }
+
+  function renderFilters() {
+    ensureFilters();
+    var c = countsOf(visibleRuns());
+    filterNodes.forEach(function (node) {
+      var pressed = filter === node.f.id;
+      node.btn.setAttribute("aria-pressed", pressed ? "true" : "false");
+      node.label.nodeValue = (pressed ? "✓ " : "") + node.f.label + " ";
+      node.n.textContent = String(c[node.f.id] || 0);
+    });
+  }
+
+  /* 只有提供 task_group 时才能声称“本次任务”，否则一律显示全部 */
+  var scopeNodes = null;
+
+  function renderScope() {
+    if (!currentGroup) {
+      els.scopeChip.className = "scope";
+      els.scopeChip.textContent = "范围：全部任务";
+      scopeNodes = null;
+      return;
+    }
+    if (!scopeNodes || els.scopeChip.className !== "scope-toggle") {
+      els.scopeChip.className = "scope-toggle";
+      els.scopeChip.textContent = "";
+      scopeNodes = [];
+      [["task", "本次任务"], ["all", "全部任务"]].forEach(function (pair) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = pair[1];
+        b.addEventListener("click", function () {
+          scope = pair[0];
+          renderScope();
+          renderFilters();
+          renderList();
+          say("范围：" + pair[1] + "。");
+        });
+        els.scopeChip.appendChild(b);
+        scopeNodes.push({ id: pair[0], btn: b });
+      });
+    }
+    scopeNodes.forEach(function (node) {
+      node.btn.setAttribute("aria-pressed", scope === node.id ? "true" : "false");
+    });
+  }
+
+  function renderBanner() {
+    var message = "";
+    if (runsError) {
+      message = "列表加载失败：" + runsError + "。" +
+        (lastOk ? "以下为 " + clock(lastOk) + " 的最近记录，可刷新重试。" : "尚无可显示记录，可刷新重试。");
+    }
+    els.listError.hidden = !message;
+    els.listError.textContent = message;
+
+    var detailStale = "";
+    if (detailError && detail) {
+      detailStale = "详情获取失败，以下为 " + (detailAt ? clock(detailAt) + " 的最近记录" : "最近记录") + "。";
+    } else if (detailError) {
+      detailStale = "详情获取失败，将自动重试。";
+    }
+    els.staleHint.hidden = !detailStale;
+    els.staleHint.textContent = detailStale;
+  }
+
+  function renderConn() {
+    if (runsError) {
+      els.conn.dataset.state = "error";
+      els.connText.textContent = lastOk ? "连接异常 · 显示 " + clock(lastOk) + " 的记录" : "连接异常";
+    } else if (!lastOk) {
+      els.conn.dataset.state = "loading";
+      els.connText.textContent = "连接中…";
+    } else {
+      els.conn.dataset.state = "ok";
+      els.connText.textContent = "已更新 " + clock(lastOk);
+    }
+  }
+
+  /* ---------- 详情 ---------- */
+
+  function revokeShot(fig) {
+    var obj = fig.dataset.obj;
+    if (obj) { URL.revokeObjectURL(obj); delete fig.dataset.obj; }
+  }
+
+  function makeShot(url, digest) {
+    var fig = document.createElement("figure");
+    fig.className = "shot";
+    var img = document.createElement("img");
+    img.alt = "任务截图";
+    img.loading = "lazy";
+    var cap = document.createElement("figcaption");
+    cap.textContent = "截图 ·" + digestTail(digest);
+    fig.appendChild(img);
+    fig.appendChild(cap);
+    // 带 Bearer 头取图，再转 blob；URL 里不带 token
+    api(url).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.blob();
+    }).then(function (blob) {
+      if (!fig.isConnected) return;
+      var obj = URL.createObjectURL(blob);
+      fig.dataset.obj = obj;
+      img.src = obj;
+    }).catch(function () {
+      if (!fig.isConnected) return;
+      fig.dataset.failed = "true";
+      cap.textContent = "截图加载失败 ·" + digestTail(digest);
+    });
+    return fig;
+  }
+
+  function clearShots() {
+    shotNodes.forEach(function (fig) { revokeShot(fig); fig.remove(); });
+    shotNodes = new Map();
+    if (shotPlaceholder && shotPlaceholder.parentNode) shotPlaceholder.remove();
+    shotPlaceholder = null;
+  }
+
+  function renderShots(images, loading) {
+    var list = [];
+    if (images && typeof images.length === "number") {
+      for (var i = 0; i < images.length; i++) {
+        var u = images[i];
+        if (typeof u === "string" && u && sameOrigin(u) && list.indexOf(u) === -1) list.push(u);
+      }
+    }
+    var seen = new Map();
+    for (var k = 0; k < list.length; k++) {
+      var url = list[k];
+      seen.set(url, true);
+      var fig = shotNodes.get(url);
+      if (!fig) { fig = makeShot(url, digestOf(url)); shotNodes.set(url, fig); }
+      els.dShots.appendChild(fig);
+    }
+    var stale = [];
+    shotNodes.forEach(function (f, u) { if (!seen.has(u)) stale.push(u); });
+    for (var m = 0; m < stale.length; m++) {
+      var old = shotNodes.get(stale[m]);
+      revokeShot(old);
+      old.remove();
+      shotNodes.delete(stale[m]);
+    }
+    if (!list.length) {
+      if (!shotPlaceholder) {
+        shotPlaceholder = document.createElement("p");
+        shotPlaceholder.className = "placeholder";
+      }
+      shotPlaceholder.textContent = loading ? "正在读取截图…" : "暂无截图。";
+      els.dShots.appendChild(shotPlaceholder);
+    } else if (shotPlaceholder && shotPlaceholder.parentNode) {
+      shotPlaceholder.remove();
+    }
+  }
+
+  var EVENT_KIND = {
+    command_execution: "终端",
+    mcp_tool_call: "工具",
+    file_change: "文件",
+    agent_message: "说明"
+  };
+  var EVENT_STATUS = { completed: "完成", in_progress: "执行中", started: "已开始", failed: "失败" };
+
+  function eventStatusLabel(run, ev) {
+    if (ev.status === null || ev.status === undefined || String(ev.status) === "") return "";
+    if (run && run.status !== "running" && run.status !== "starting" && ev.status === "in_progress") return "无结束回执";
+    return EVENT_STATUS[ev.status] || String(ev.status);
+  }
+
+  function renderEvents(container, events, run, limit) {
+    container.textContent = "";
+    var items = [];
+    if (events && typeof events.length === "number") {
+      var start = limit ? Math.max(0, events.length - limit) : 0;
+      for (var i = start; i < events.length; i++) if (events[i] && typeof events[i] === "object") items.push(events[i]);
+    }
+    if (!items.length) {
+      var empty = document.createElement("li");
+      empty.className = "placeholder";
+      empty.textContent = "暂无动作记录。";
+      container.appendChild(empty);
+      return;
+    }
+    for (var j = 0; j < items.length; j++) {
+      var ev = items[j];
+      var li = document.createElement("li");
+      var kind = document.createElement("span");
+      kind.className = "ev-kind";
+      kind.textContent = EVENT_KIND[ev.kind] || "动作";
+      var title = document.createElement("span");
+      title.className = "ev-title";
+      title.textContent = text(ev.title, "未命名动作");
+      li.appendChild(kind);
+      li.appendChild(title);
+      var st = eventStatusLabel(run, ev);
+      if (st) {
+        var status = document.createElement("span");
+        status.className = "ev-status";
+        status.textContent = st;
+        li.appendChild(status);
+      }
+      container.appendChild(li);
+    }
+  }
+
+  function renderProgress(run, events, loading) {
+    if (loading) {
+      els.dProgress.textContent = "";
+      var wait = document.createElement("li");
+      wait.className = "placeholder";
+      wait.textContent = "正在读取最近动作…";
+      els.dProgress.appendChild(wait);
+      els.dRecNote.hidden = true;
+      els.dRecNote.textContent = "";
+      return;
+    }
+    renderEvents(els.dProgress, events, run, 4);
+    els.dRecNote.hidden = false;
+    var total = events && typeof events.length === "number" ? events.length : 0;
+    els.dRecNote.textContent = "以上为最近动作摘要；完整原始动作在下方折叠区。本次共记录 " + total + " 条动作。";
+  }
+
+  function renderResult(result, loading) {
+    var value = typeof result === "string" ? result : "";
+    var trimmed = value.trim();
+    if (trimmed) {
+      els.dResult.hidden = false;
+      els.dResult.textContent = value;
+      els.dResultNote.hidden = true;
+      els.dResultNote.textContent = "";
+    } else {
+      els.dResult.hidden = true;
+      els.dResult.textContent = "";
+      els.dResultNote.hidden = false;
+      els.dResultNote.textContent = loading ? "正在读取结果…" : "暂无返回结果（执行中或尚未返回）。";
+    }
+  }
+
+  function renderHeadBadges(run) {
+    var info = statusInfo(run.status);
+    els.dStage.textContent = info.label;
+    els.dStage.dataset.tone = info.tone;
+
+    if (run.task_group) {
+      els.dGroup.hidden = false;
+      els.dGroup.textContent = "任务组 " + shortId(run.task_group);
+      els.dGroup.dataset.tone = "muted";
+    } else {
+      els.dGroup.hidden = true;
+    }
+
+    if (run.parent_run_id) {
+      els.dParent.hidden = false;
+      els.dParent.textContent = "关联任务 " + shortId(run.parent_run_id);
+    } else {
+      els.dParent.hidden = true;
+    }
+
+    els.dQuiet.hidden = !(run.needs_attention && (run.status === "running" || run.status === "starting"));
+    els.dLegacy.hidden = !!run.messaging_enabled;
+  }
+
+  function renderCancel(run) {
+    var active = run.status === "starting" || run.status === "running";
+    var cancellable = active && !run.cancel_requested;
+    els.cancelBtn.hidden = !(active || run.cancel_requested);
+    els.cancelBtn.disabled = !cancellable || cancelBusy;
+    els.cancelBtn.textContent = run.cancel_requested ? "取消请求已发送" : "取消任务";
+
+    var hint = "";
+    if (cancelBusy) hint = "正在发送取消请求…";
+    else if (cancelMsg) hint = cancelMsg;
+    else if (run.cancel_requested && active) hint = "取消请求已发送，等待服务端确认。";
+    else if (active) hint = "取消会请求正在运行的原执行者停止。";
+    els.cancelHint.hidden = !hint;
+    els.cancelHint.textContent = hint;
+  }
+
+  function renderRefChips(run) {
+    els.dRefChips.textContent = "";
+    var images = detail && Array.isArray(detail.images) ? detail.images : [];
+    if (!images.length) return;
+    images.forEach(function (url) {
+      var digest = digestOf(url);
+      if (!digest) return;
+      var on = attached[run.id] === digest;
+      var chip = document.createElement("span");
+      chip.className = "refchip" + (on ? " on" : "");
+      chip.appendChild(document.createTextNode((on ? "已引用：" : "引用截图：") + "末尾 " + digestTail(digest)));
+      if (on) {
+        var off = document.createElement("button");
+        off.type = "button";
+        off.className = "linklike";
+        off.textContent = "取消引用";
+        off.disabled = sendBusy;
+        off.addEventListener("click", function () {
+          attached[run.id] = null;
+          writeDraft(run.id, els.reply.value, null);
+          renderRefChips(run);
+          say("已取消引用截图。");
+        });
+        chip.appendChild(off);
+      } else {
+        var pick = document.createElement("button");
+        pick.type = "button";
+        pick.className = "linklike";
+        pick.textContent = "引用";
+        pick.disabled = sendBusy;
+        pick.addEventListener("click", function () {
+          if (sendBusy) return;
+          attached[run.id] = digest;
+          writeDraft(run.id, els.reply.value, digest);
+          renderRefChips(run);
+          say("已引用截图末尾 " + digestTail(digest) + "。");
+        });
+        chip.appendChild(pick);
+      }
+      els.dRefChips.appendChild(chip);
+    });
+  }
+
+  function renderComposer(run) {
+    els.fbRecipient.textContent = "";
+    els.fbRecipient.appendChild(document.createTextNode("接收对象："));
+    var strong = document.createElement("strong");
+    strong.textContent = "执行者 · " + text(run.actual_model, "模型待确认");
+    els.fbRecipient.appendChild(strong);
+    els.fbRecipient.appendChild(document.createTextNode("（本任务）　反馈只影响本任务。"));
+
+    els.sendHint.textContent = sendHintFor(run);
+    els.sendBtn.disabled = sendBusy || !canSend(run);
+    els.reply.readOnly = sendBusy;
+    renderRefChips(run);
+  }
+
+  function stepStates(state) {
+    var submit = "pending", delivered = "pending", replied = "pending";
+    if (state === "queued") submit = "done";
+    else if (state === "delivered") { submit = "done"; delivered = "done"; }
+    else if (state === "replied") { submit = "done"; delivered = "done"; replied = "done"; }
+    else if (state === "failed") { submit = "done"; delivered = "failed"; }
+    return [["已提交", submit], ["已接收", delivered], ["已回复", replied]];
+  }
+
+  function msgTime(m) {
+    return toMs(m.created_at !== undefined ? m.created_at : m.at);
+  }
+
+  /* 消息引用的截图：后端返回 {digest, mimeType, url}，本地未送达条目只存 digest */
+  function messageDigest(m) {
+    if (!m) return "";
+    if (typeof m.image === "string") return m.image;
+    if (m.image && typeof m.image.digest === "string") return m.image.digest;
+    return "";
+  }
+
+  function messageImageUrl(m) {
+    return (m && m.image && typeof m.image.url === "string") ? m.image.url : "";
+  }
+
+  function mergeMessages(runId) {
+    var server = cachedMessages(runId) || (detail && selectedId === runId && Array.isArray(detail.messages) ? detail.messages : []) || [];
+    var seen = {};
+    var out = [];
+    server.forEach(function (m) {
+      if (!m || typeof m !== "object") return;
+      if (m.id) seen[m.id] = true;
+      out.push({ m: m, local: false });
+    });
+    outboxList(runId).forEach(function (e) {
+      if (!e || !e.id || seen[e.id]) return;
+      out.push({ m: e, local: true });
+    });
+    out.sort(function (a, b) {
+      var ta = msgTime(a.m), tb = msgTime(b.m);
+      if (!isFinite(ta)) ta = 0;
+      if (!isFinite(tb)) tb = 0;
+      return ta - tb;
+    });
+    return out;
+  }
+
+  function renderMessages(run) {
+    els.msgList.textContent = "";
+    if (!run) return;
+    var items = mergeMessages(run.id);
+    if (!items.length) {
+      var li0 = document.createElement("li");
+      li0.className = "placeholder";
+      li0.textContent = "还没有反馈记录。";
+      els.msgList.appendChild(li0);
+      return;
+    }
+    items.forEach(function (item) {
+      var m = item.m;
+      var state = typeof m.status === "string" ? m.status : "";
+      var info = MSG[state] || { label: state || "状态未知", tone: "muted", note: "" };
+
+      var li = document.createElement("li");
+      li.className = "msg";
+      li.dataset.state = state;
+
+      var head = document.createElement("div");
+      head.className = "msg-head";
+      var who = document.createElement("span");
+      who.textContent = "你的反馈 → 执行者";
+      var when = document.createElement("span");
+      when.textContent = fmtTime(m.created_at !== undefined ? m.created_at : m.at);
+      head.appendChild(who);
+      head.appendChild(when);
+      li.appendChild(head);
+
+      var body = document.createElement("p");
+      body.className = "msg-text";
+      body.textContent = text(m.text, "");
+      li.appendChild(body);
+
+      var imgDigest = messageDigest(m);
+      if (imgDigest) {
+        var ref = document.createElement("p");
+        ref.className = "msg-ref";
+        ref.textContent = "引用截图 ·末段 " + digestTail(imgDigest) + "（发送时冻结）";
+        li.appendChild(ref);
+      }
+
+      var steps = document.createElement("ol");
+      steps.className = "steps";
+      var marks = { done: "✓", pending: "○", failed: "✕" };
+      stepStates(state).forEach(function (pair) {
+        var it = document.createElement("li");
+        it.dataset.step = pair[1];
+        it.textContent = marks[pair[1]] + " " + pair[0];
+        steps.appendChild(it);
+      });
+      li.appendChild(steps);
+
+      var badgeRow = document.createElement("p");
+      badgeRow.className = "msg-note";
+      var badge = makeBadge(info.label, info.tone);
+      badgeRow.appendChild(badge);
+      if (info.note) badgeRow.appendChild(document.createTextNode("　" + info.note));
+      li.appendChild(badgeRow);
+
+      if (m.reply) {
+        var reply = document.createElement("p");
+        reply.className = "msg-text";
+        reply.textContent = "执行者回复：" + String(m.reply);
+        li.appendChild(reply);
+      }
+      if (m.error) {
+        var err = document.createElement("p");
+        err.className = "msg-note";
+        err.textContent = "错误信息：" + String(m.error);
+        li.appendChild(err);
+      }
+
+      var actions = document.createElement("div");
+      actions.className = "actions msg-actions";
+      if (item.local && state === "uncertain") {
+        var retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "btn small";
+        retry.textContent = "重试（同一提交）";
+        retry.addEventListener("click", function () { retryUncertain(run.id, m.id); });
+        actions.appendChild(retry);
+      } else if (state === "failed") {
+        var again = document.createElement("button");
+        again.type = "button";
+        again.className = "btn small";
+        again.textContent = "把原文放回输入框";
+        again.addEventListener("click", function () {
+          els.reply.value = text(m.text, "");
+          writeDraft(run.id, els.reply.value, attached[run.id] || null);
+          els.reply.focus();
+          say("已把这条反馈原文放回输入框，可修改后重新发送。");
+        });
+        actions.appendChild(again);
+      }
+      if (actions.childNodes.length) li.appendChild(actions);
+
+      els.msgList.appendChild(li);
+    });
+  }
+
+  function cacheServerMessage(runId, msg) {
+    if (!msg || !msg.id) return;
+    var entry = msgCache[runId];
+    if (!entry || !Array.isArray(entry.messages)) entry = { messages: [], at: 0 };
+    var replaced = false;
+    for (var i = 0; i < entry.messages.length; i++) {
+      if (entry.messages[i] && entry.messages[i].id === msg.id) { entry.messages[i] = msg; replaced = true; break; }
+    }
+    if (!replaced) entry.messages.push(msg);
+    entry.at = Date.now();
+    msgCache[runId] = entry;
+  }
+
+  function setCacheMessages(runId, messages) {
+    msgCache[runId] = {
+      messages: Array.isArray(messages) ? messages.filter(function (m) { return m && typeof m === "object"; }) : [],
+      at: Date.now()
+    };
+  }
+
+  function renderDetail() {
+    renderBanner();
+    if (!selectedId || !currentRun) {
+      els.detailBody.hidden = true;
+      els.detailEmpty.hidden = false;
+      els.detailEmpty.textContent = detailError
+        ? "详情加载失败，将自动重试。"
+        : (runs === null ? "正在加载任务…" : "选择左侧任务查看详情");
+      if (!currentRun) {
+        clearShots();
+        els.dTitle.textContent = "—";
+        els.dStage.textContent = "—";
+        els.dStage.removeAttribute("data-tone");
+        els.dGroup.hidden = true;
+        els.dParent.hidden = true;
+        els.dQuiet.hidden = true;
+        els.dLegacy.hidden = true;
+        els.cancelBtn.hidden = true;
+        els.cancelHint.hidden = true;
+      }
+      return;
+    }
+
+    var run = currentRun;
+    els.detailEmpty.hidden = true;
+    els.detailBody.hidden = false;
+    els.dTitle.textContent = text(run.title, String(run.id));
+    renderHeadBadges(run);
+    renderCancel(run);
+
+    var messages = cachedMessages(run.id);
+    var waiting = awaitingInput(run, messages);
+    els.dGoal.textContent = text(run.goal, "任务未提供目标摘要，请以上方执行者信息与动作为准。");
+    if (waiting) {
+      els.dGoal.textContent = els.dGoal.textContent + "（执行者本轮已回复，等你下一步。）";
+    }
+
+    var loading = !detail && !detailError;
+    renderProgress(run, detail && detail.events, loading);
+    renderResult(detail && detail.result, loading);
+    renderShots(detail && detail.images, loading);
+
+    els.mRole.textContent = roleLabel(run.role);
+    els.mModel.textContent = text(run.actual_model, "模型待确认");
+    els.mWorkspace.textContent = text(run.cwd ? basename(run.cwd) : "", "工作区待确认");
+    els.mUpdated.textContent = fmtTime(run.updated_at);
+
+    if (shownRunId !== run.id) {
+      var d = readDraft(run.id);
+      els.reply.value = d.text || "";
+      attached[run.id] = d.image || null;
+      shownRunId = run.id;
+      clearSendError();
+    }
+    renderComposer(run);
+    renderMessages(run);
+    renderRefChips(run);
+
+    renderEvents(els.dRaw, detail && detail.events, run, 0);
+  }
+
+  /* ---------- 发送（锁定 + 同 id 幂等 + 不自动重复执行） ---------- */
+
+  function readRunFromList(id) {
+    if (!runs) return null;
+    for (var i = 0; i < runs.length; i++) if (String(runs[i].id) === String(id)) return runs[i];
+    return null;
+  }
+
+  function showSendError(t) {
+    els.sendError.textContent = t;
+    els.sendError.hidden = false;
+    els.reply.setAttribute("aria-invalid", "true");
+  }
+
+  function clearSendError() {
+    els.sendError.textContent = "";
+    els.sendError.hidden = true;
+    els.reply.removeAttribute("aria-invalid");
+  }
+
+  function finishSend(runId) {
+    sendBusy = false;
+    els.reply.readOnly = false;
+    if (currentRun && String(currentRun.id) === String(runId)) {
+      renderComposer(currentRun);
+      renderMessages(currentRun);
+    }
+  }
+
+  function postFeedback(runId, id, textValue, image) {
+    return api("/api/runs/" + encodeURIComponent(runId) + "/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id, text: textValue, image: image === null ? null : image })
+    }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (data) {
+        return { res: res, data: data };
+      });
+    });
+  }
+
+  function deliver(runId, entry, attempt) {
+    return postFeedback(runId, entry.id, entry.text, entry.image).then(function (out) {
+      var res = out.res, data = out.data;
+      if (res.ok) {
+        var msg = data && data.message ? data.message : null;
+        if (msg) cacheServerMessage(runId, msg);
+        outboxRemove(runId, entry.id);
+        if (currentRun && String(currentRun.id) === String(runId) && shownRunId === runId) {
+          els.reply.value = "";
+          attached[runId] = null;
+          writeDraft(runId, "", null);
+        }
+        clearSendError();
+        finishSend(runId);
+        renderList();
+        loadDetail(runId);
+        say("反馈已提交，等待执行者接收。");
+        return;
+      }
+
+      var serverMsg = (data && typeof data.error === "string") ? data.error : ("HTTP " + res.status);
+      outboxRemove(runId, entry.id);
+      if (res.status === 401) {
+        showSendError("鉴权失效，请重新打开面板链接。");
+        say("鉴权失效。");
+      } else if (res.status === 409) {
+        showSendError("该任务当前不能接收反馈：" + serverMsg);
+        say("反馈被拒绝：" + serverMsg);
+      } else {
+        showSendError("发送失败（HTTP " + res.status + "）：" + serverMsg + "。原文已保留。");
+        say("发送失败。");
+      }
+      finishSend(runId);
+    }).catch(function () {
+      // 网络层不确定：不自动重复执行，先读回服务器状态
+      entry.status = "uncertain";
+      entry.at = Date.now();
+      outboxPut(runId, entry);
+      renderMessagesFor(runId);
+      if (attempt === 0) {
+        say("网络中断，正在读回服务器状态。");
+        return getJson("/api/runs/" + encodeURIComponent(runId)).then(function (data) {
+          var msgs = data && data.messages;
+          if (Array.isArray(msgs)) setCacheMessages(runId, msgs);
+          var known = false;
+          if (Array.isArray(msgs)) {
+            for (var i = 0; i < msgs.length; i++) if (msgs[i] && msgs[i].id === entry.id) known = true;
+          }
+          if (known) {
+            outboxRemove(runId, entry.id);
+            finishSend(runId);
+            renderList();
+            renderDetail();
+            say("已在服务器上找到这条反馈。");
+            return;
+          }
+          // 服务器没有这条：同一 id 自动重试一次，保证不会重复执行
+          return deliver(runId, entry, 1);
+        }).catch(function () {
+          finishSend(runId);
+          renderList();
+          say("无法确认是否送达；可用“重试（同一提交）”读取真实状态。");
+        });
+      }
+      finishSend(runId);
+      renderList();
+      say("无法确认是否送达；可用“重试（同一提交）”读取真实状态。");
+    });
+  }
+
+  function doSend() {
+    var run = currentRun;
+    if (!run || sendBusy || !canSend(run)) return;
+    var value = els.reply.value.trim();
+    if (!value) {
+      showSendError("请输入反馈内容后再发送。");
+      els.reply.focus();
+      return;
+    }
+    if (value.length > 12000) {
+      showSendError("反馈内容过长（上限 12000 字），请精简后再发送。");
+      els.reply.focus();
+      return;
+    }
+    clearSendError();
+
+    var entry = {
+      id: uuid(),
+      run: run.id,
+      text: value,
+      image: attached[run.id] || null,
+      at: Date.now(),
+      status: "sending"
+    };
+    outboxPut(run.id, entry);
+    sendBusy = true;
+    renderComposer(run);
+    renderMessages(run);
+    say("正在发送反馈。");
+    deliver(run.id, entry, 0);
+  }
+
+  function retryUncertain(runId, id) {
+    var list = outboxList(runId);
+    var entry = null;
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].id === id) entry = list[i];
+    if (!entry || sendBusy) return;
+    entry.status = "sending";
+    outboxPut(runId, entry);
+    sendBusy = true;
+    if (currentRun && String(currentRun.id) === String(runId)) renderComposer(currentRun);
+    renderMessagesFor(runId);
+    say("按同一提交编号重新发送。");
+    deliver(runId, entry, 1);
+  }
+
+  /* ---------- 数据流 ---------- */
+
+  function applyRun(run) {
+    if (!runs || !run) return;
+    for (var i = 0; i < runs.length; i++) {
+      if (String(runs[i].id) === String(run.id)) { runs[i] = run; return; }
+    }
+  }
+
+  /* 页面重载后，旧的在途提交不能继续显示为“派发中”，转为“无法确认” */
+  function normalizeOutbox(runId) {
+    var list = outboxList(runId);
+    var changed = false;
+    var now = Date.now();
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (e && e.status === "sending" && now - (e.at || 0) > 20000) { e.status = "uncertain"; changed = true; }
+    }
+    if (changed) outboxSave(runId, list);
+  }
+
+  function selectRun(id) {
+    if (!id) return;
+    if (String(selectedId) === String(id)) { renderList(); return; }
+    selectedId = String(id);
+    currentRun = readRunFromList(selectedId);
+    normalizeOutbox(selectedId);
+    detail = null;
+    detailError = "";
+    clearSendError();
+    clearShots();
+    renderList();
+    renderDetail();
+    loadDetail(selectedId);
+  }
+
+  function renderMessagesFor(runId) {
+    if (currentRun && String(currentRun.id) === String(runId)) renderMessages(currentRun);
+  }
+
+  function loadDetail(id) {
+    if (!id) return Promise.resolve();
+    return getJson("/api/runs/" + encodeURIComponent(id)).then(function (data) {
+      if (String(selectedId) !== String(id)) {
+        if (data && data.run) applyRun(data.run);
+        return;
+      }
+      detailError = "";
+      detailAt = Date.now();
+      if (data && data.run) { currentRun = data.run; applyRun(data.run); }
+      detail = {
+        events: data ? data.events : null,
+        result: data ? data.result : "",
+        images: data ? data.images : null,
+        messages: data ? data.messages : null
+      };
+      setCacheMessages(id, detail.messages);
+      renderList();
+      renderDetail();
+    }).catch(function (err) {
+      if (String(selectedId) === String(id)) {
+        detailError = (err && err.message) || "请求失败";
+        renderDetail();
+      }
+    });
+  }
+
+  /* 只读取真实消息用于分桶：仅针对可能“等你下一步”的运行中任务，逐个补齐 */
+  function refreshOneCache() {
+    if (!runs) return;
+    var candidate = null;
+    for (var i = 0; i < runs.length; i++) {
+      var run = runs[i];
+      if (!run || !run.messaging_enabled) continue;
+      if (run.status !== "running" && run.status !== "starting") continue;
+      if (String(run.id) === String(selectedId)) continue;
+      var entry = msgCache[run.id];
+      if (entry && Date.now() - entry.at < 6000) continue;
+      candidate = run;
+      break;
+    }
+    if (!candidate) return;
+    getJson("/api/runs/" + encodeURIComponent(candidate.id)).then(function (data) {
+      if (!data) return;
+      if (data.run) applyRun(data.run);
+      setCacheMessages(candidate.id, data.messages);
+      renderList();
+    }).catch(function () { /* 单个运行读取失败不影响列表 */ });
+  }
+
+  function tick(manual) {
+    if (pollBusy) return;
+    pollBusy = true;
+    if (manual) { cancelMsg = ""; els.refreshBtn.disabled = true; }
+
+    api("/api/runs").then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }).then(function (data) {
+      runsError = "";
+      var list = data && data.runs;
+      runs = Array.isArray(list) ? list : [];
+      lastOk = Date.now();
+
+      if (selectedId) {
+        var found = null;
+        for (var i = 0; i < runs.length; i++) if (String(runs[i].id) === selectedId) found = runs[i];
+        if (found) currentRun = found;
+        else { selectedId = null; currentRun = null; detail = null; detailError = ""; clearShots(); }
+      }
+
+      renderFilters();
+      renderScope();
+      renderList();
+      renderBanner();
+      renderConn();
+      if (selectedId) loadDetail(selectedId);
+      else renderDetail();
+      refreshOneCache();
+    }).catch(function (err) {
+      runsError = (err && err.message) || "请求失败";
+      renderList();
+      renderBanner();
+      renderConn();
+    }).then(function () {
+      pollBusy = false;
+      els.refreshBtn.disabled = false;
+    });
+  }
+
+  /* ---------- 交互绑定 ---------- */
+
+  els.reply.addEventListener("input", function () {
+    if (!currentRun) return;
+    writeDraft(currentRun.id, els.reply.value, attached[currentRun.id] || null);
+    if (!els.sendError.hidden) clearSendError();
+  });
+
+  els.sendBtn.addEventListener("click", doSend);
+
+  els.refreshBtn.addEventListener("click", function () { tick(true); });
+
+  els.taskList.addEventListener("keydown", function (e) {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
+    var items = Array.prototype.slice.call(els.taskList.querySelectorAll(".card"));
+    if (!items.length) return;
+    var index = items.indexOf(document.activeElement);
+    var next = index;
+    if (e.key === "ArrowDown") next = index < 0 ? 0 : Math.min(items.length - 1, index + 1);
+    else if (e.key === "ArrowUp") next = index < 0 ? items.length - 1 : Math.max(0, index - 1);
+    else if (e.key === "Home") next = 0;
+    else next = items.length - 1;
+    if (next === index) return;
+    e.preventDefault();
+    items[next].focus();
+    selectRun(items[next].dataset.id);
+  });
+
+  els.cancelBtn.addEventListener("click", function () {
+    var run = currentRun;
+    if (!run || cancelBusy) return;
+    if (!(run.status === "starting" || run.status === "running") || run.cancel_requested) return;
+    cancelBusy = true;
+    cancelMsg = "";
+    renderCancel(run);
+    api("/api/runs/" + encodeURIComponent(run.id) + "/cancel", { method: "POST" }).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      if (currentRun && String(currentRun.id) === String(run.id)) currentRun.cancel_requested = true;
+      cancelMsg = "取消请求已发送，等待服务端确认。";
+      say("取消请求已发送。");
+    }).catch(function (err) {
+      cancelMsg = "取消请求失败（" + ((err && err.message) || "网络错误") + "），可重试。";
+      say(cancelMsg);
+    }).then(function () {
+      cancelBusy = false;
+      if (currentRun) renderCancel(currentRun);
+      tick(false);
+    });
+  });
+
+  window.addEventListener("beforeunload", function () { clearShots(); });
+
+  /* 首屏占位（真实数据到达前不显示任何示例任务） */
+  renderFilters();
+  renderScope();
+  renderBanner();
+  renderConn();
+  renderDetail();
+
+  tick(false);
+  setInterval(function () { tick(false); }, POLL_MS);
+})();
+</script>
+</body>
+</html>
